@@ -1,3 +1,5 @@
+"use client"
+
 import Image from 'next/image';
 import category1 from '@/assets/Category1.svg';
 import category2 from '@/assets/Category2.svg';

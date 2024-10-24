@@ -1,3 +1,5 @@
+"use client"
+
 import Image from 'next/image'
 import heroimage from '@/assets/Hero.svg'
 
