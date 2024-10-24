@@ -17,28 +17,35 @@ export default function Hero() {
             <p className="text-lg sm:text-xl mb-8">
               Simple, Easy-to-Use Learning for Better Farming
             </p>
-            <button className="bg-green-500 text-white px-6 py-3 rounded-full text-lg hover:bg-green-600 transition">
+            <button className="bg-green-500 text-white px-20 py-3 rounded-full text-lg hover:bg-green-600 transition shadow-md hover:shadow-lg">
               Get Started
             </button>
           </div>
+        </div>
+      </div>
+      
+      {/* Optimized Image Section */}
+      <div className="w-full mb-20 md:mb-40">
+        <div className="w-full h-[200px] sm:h-[300px] md:h-[400px] lg:h-[500px]">
+          <Image
+            src={heroimage}
+            alt="Hero image"
+            width={800}
+            height={500}
+            className="w-full h-full object-cover rounded-lg shadow-lg"
+            priority // Load image with priority
+          />
+        </div>
+      </div>
 
-          {/* Image Section */}
-          <div className="w-full">
-            <div className="relative w-full h-[300px] sm:h-[400px] md:h-[500px] lg:h-[600px] overflow-hidden">
-              <Image
-                src={heroimage}
-                alt={"heroimage"}
-                width={800}
-                height={500}
-                className="w-full h-auto rounded-lg shadow-lg border border-gray-200"
-              />
-            </div>
-          </div>
-        </div>
-        <div className='mx-6 mb-10'>
-          <p className='text-[40px]'>All the farming knowledge you need in one place—</p>
-          <p className='text-[24px]'>learn, grow, and succeed with our easy-to-use platform designed for farmers.</p>
-        </div>
+      {/* Subtext Section */}
+      <div className='mx-6 mb-14'>
+        <p className='text-[40px] mb-6'>
+          All the farming knowledge you need in one place—
+        </p>
+        <p className='text-[24px]'>
+          Learn, grow, and succeed with our easy-to-use platform designed for farmers.
+        </p>
       </div>
     </section>
   )
