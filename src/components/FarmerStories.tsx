@@ -17,7 +17,7 @@ const stories = [
   {
     name: "Jane Doe",
     location: "California, USA",
-    story: "With the new irrigation system, I've increased my crop yield by 30%!",
+    story: "With the new irrigation system, I&apos;ve increased my crop yield by 30%!",
     improvement: "30% yield increase",
     benefits: ["Water Conservation", "Cost Savings"],
     image: farmerstories

@@ -1,3 +1,5 @@
+"use client"
+
 import Image from 'next/image';
 import toptrendmain from '@/assets/TopTrend_main.svg';
 import trend1 from '@/assets/Trend1.svg';
