@@ -1,0 +1,151 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  INSTRUCTOR
+  ADMIN
+}
+
+enum Language {
+  ENGLISH
+  HINDI
+}
+
+enum ConsultationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model User {
+  id                String         @id @default(cuid())
+  email             String         @unique
+  password          String?
+  name              String
+  role              Role           @default(USER)
+  googleId          String?        @unique
+  preferredLanguage Language       @default(ENGLISH)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  courses           CourseEnrollment[]
+  consultations     Consultation[]
+  payments          Payment[]
+  tickets           Ticket[]
+  instructorProfile InstructorProfile?
+}
+
+model InstructorProfile {
+  id          String         @id @default(cuid())
+  user        User           @relation(fields: [userId], references: [id])
+  userId      String         @unique
+  bio         String
+  expertise   String[]
+  courses     Course[]
+  consultations Consultation[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model Course {
+  id          String         @id @default(cuid())
+  title       String
+  description String
+  videoUrl    String
+  price       Float
+  instructor  InstructorProfile @relation(fields: [instructorId], references: [id])
+  instructorId String
+  payments    Payment[]
+  language    Language
+  materials   CourseMaterial[]
+  enrollments CourseEnrollment[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model CourseMaterial {
+  id          String   @id @default(cuid())
+  course      Course   @relation(fields: [courseId], references: [id])
+  courseId    String
+  title       String
+  type        String   // e.g., "PDF", "LINK"
+  content     String   // URL or file path
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CourseEnrollment {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  course    Course   @relation(fields: [courseId], references: [id])
+  courseId  String
+  enrolledAt DateTime @default(now())
+  completedAt DateTime?
+
+  @@unique([userId, courseId])
+}
+
+model Consultation {
+  id          String             @id @default(cuid())
+  user        User               @relation(fields: [userId], references: [id])
+  userId      String
+  instructor  InstructorProfile  @relation(fields: [instructorId], references: [id])
+  instructorId String
+  status      ConsultationStatus @default(PENDING)
+  scheduledAt DateTime
+  duration    Int                // in minutes
+  meetLink    String?
+  price       Float
+  payment     Payment?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  user           User          @relation(fields: [userId], references: [id])
+  userId         String
+  amount         Float
+  currency       String
+  status         String
+  paymentMethod  String
+  transactionId  String        @unique
+  course         Course?       @relation(fields: [courseId], references: [id])
+  courseId       String?
+  consultation   Consultation? @relation(fields: [consultationId], references: [id])
+  consultationId String?       @unique
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model Ticket {
+  id          String       @id @default(cuid())
+  user        User         @relation(fields: [userId], references: [id])
+  userId      String
+  title       String
+  description String
+  status      TicketStatus @default(OPEN)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
