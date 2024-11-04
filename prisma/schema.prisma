@@ -29,6 +29,7 @@ enum ConsultationStatus {
   APPROVED
   REJECTED
   COMPLETED
+  CANCELLED
 }
 
 enum TicketStatus {
@@ -38,12 +39,28 @@ enum TicketStatus {
   CLOSED
 }
 
+enum VideoSource {
+  UPLOADED
+  YOUTUBE
+  VIMEO
+}
+
+enum Permission {
+  MANAGE_USERS
+  MANAGE_COURSES
+  MANAGE_CONSULTATIONS
+  MANAGE_PAYMENTS
+  MANAGE_ROLES
+  MANAGE_SYSTEM_CONFIG
+}
+
 model User {
   id                String         @id @default(cuid())
   email             String         @unique
   password          String?
   name              String
   role              Role           @default(USER)
+  permissions       Permission[]
   googleId          String?        @unique
   preferredLanguage Language       @default(ENGLISH)
   createdAt         DateTime       @default(now())
@@ -65,6 +82,22 @@ model InstructorProfile {
   consultations Consultation[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
+  hourlyRate    Float
+  availability  Availability[]
+  freeResources FreeResource[]
+}
+
+model Availability {
+  id             String             @id @default(cuid())
+  instructor     InstructorProfile  @relation(fields: [instructorId], references: [id])
+  instructorId   String
+  dayOfWeek      Int                // 0 = Sunday, 1 = Monday, etc.
+  startTime      String             // Format: "HH:MM"
+  endTime        String             // Format: "HH:MM"
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@unique([instructorId, dayOfWeek, startTime, endTime])
 }
 
 model Course {
@@ -72,6 +105,7 @@ model Course {
   title       String
   description String
   videoUrl    String
+  videoSource VideoSource
   price       Float
   instructor  InstructorProfile @relation(fields: [instructorId], references: [id])
   instructorId String
@@ -81,6 +115,9 @@ model Course {
   enrollments CourseEnrollment[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
+  audioGuide  String?
+  translatedTitle String?
+  translatedDescription String?
 }
 
 model CourseMaterial {
@@ -120,6 +157,28 @@ model Consultation {
   payment     Payment?
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
+  notes       String?
+}
+
+model PayuTransaction {
+  id             String   @id @default(cuid())
+  payment        Payment  @relation(fields: [paymentId], references: [id])
+  paymentId      String   @unique
+  txnid          String   @unique
+  amount         Float
+  productinfo    String
+  firstname      String
+  email          String
+  phone          String?
+  status         String
+  unmappedstatus String?
+  hash           String
+  mode           String?
+  error          String?
+  errorMessage   String?
+  netAmount      Float?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model Payment {
@@ -137,6 +196,7 @@ model Payment {
   consultationId String?       @unique
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+  payuTransaction PayuTransaction?
 }
 
 model Ticket {
@@ -148,4 +208,23 @@ model Ticket {
   status      TicketStatus @default(OPEN)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+}
+
+model FreeResource {
+  id            String           @id @default(cuid())
+  title         String
+  description   String
+  url           String
+  instructor    InstructorProfile @relation(fields: [instructorId], references: [id])
+  instructorId  String
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+}
+
+model SystemConfig {
+  id            String   @id @default(cuid())
+  key           String   @unique
+  value         String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }

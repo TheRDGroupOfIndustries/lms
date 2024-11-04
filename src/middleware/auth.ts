@@ -1,12 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/utils/jwt';
+import prisma from '@/utils/prisma';
 
-type NextApiHandler = (req: NextRequest, res: NextResponse) => Promise<void>;
+type NextRouteHandler = (req: AuthenticatedRequest) => Promise<NextResponse>;
+
 interface TokenPayload {
   userId: string;
 }
 
-export const authenticate = (handler: NextApiHandler) => async (req: NextRequest, res: NextResponse) => {
+interface AuthenticatedUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  phone?: string;
+}
+
+interface AuthenticatedRequest extends NextRequest {
+  user: AuthenticatedUser;
+}
+
+export const authenticate = (handler: NextRouteHandler) => async (req: NextRequest) => {
   const token = req.headers.get('authorization')?.split(' ')[1];
 
   if (!token) {
@@ -15,9 +29,20 @@ export const authenticate = (handler: NextApiHandler) => async (req: NextRequest
 
   try {
     const decoded = verifyToken(token) as TokenPayload;
-    (req as NextRequest & { user: TokenPayload }).user = decoded;
-    return handler(req, res);
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: { id: true, name: true, email: true, role: true },
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 401 });
+    }
+
+    const authenticatedReq = req as AuthenticatedRequest;
+    authenticatedReq.user = user;
+
+    return handler(authenticatedReq);
   } catch {
-    return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
 };

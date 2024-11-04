@@ -2,6 +2,15 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/app/api/(authentication)/auth/[...nextauth]/auth.config'
 import prisma from '@/utils/prisma'
+import { z } from 'zod'
+
+const formSchema = z.object({
+  role: z.enum(['USER', 'INSTRUCTOR', 'ADMIN']),
+  name: z.string().min(2),
+  preferredLanguage: z.enum(['ENGLISH', 'HINDI']),
+  bio: z.string().optional(),
+  expertise: z.string().optional(),
+})
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
@@ -10,9 +19,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { role, name, preferredLanguage, bio, expertise } = await req.json()
-
   try {
+    const body = await req.json()
+    const validatedData = formSchema.safeParse(body)
+
+    if (!validatedData.success) {
+      return NextResponse.json({ error: validatedData.error.errors }, { status: 400 })
+    }
+
+    const { role, name, preferredLanguage, bio, expertise } = validatedData.data
+
     let user = await prisma.user.findUnique({
       where: { email: session.user.email ?? undefined },
     })
@@ -46,12 +62,14 @@ export async function POST(req: Request) {
         where: { userId: user.id },
         update: {
           bio,
-          expertise: expertise.split(',').map((item: string) => item.trim()),
+          expertise: expertise ? expertise.split(',').map((item: string) => item.trim()) : [],
+          hourlyRate: 0,
         },
         create: {
           userId: user.id,
-          bio,
-          expertise: expertise.split(',').map((item: string) => item.trim()),
+          bio: bio || '',
+          expertise: expertise ? expertise.split(',').map((item: string) => item.trim()) : [],
+          hourlyRate: 0,
         },
       })
     }

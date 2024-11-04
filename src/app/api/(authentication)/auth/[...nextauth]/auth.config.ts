@@ -3,21 +3,32 @@ import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import prisma from '@/utils/prisma';
 import bcrypt from 'bcryptjs';
+import { z } from 'zod';
 
 declare module 'next-auth' {
-    interface Session {
-      user: {
-        id: string;
-      } & DefaultSession['user']
-    }
+  interface User {
+    role: string;
+  }
+  interface Session {
+    user: {
+      id: string;
+      role: string;
+    } & DefaultSession['user']
+  }
 }
 
 declare module 'next-auth/jwt' {
-    interface JWT {
-      id: string;
-      email: string;
-    }
+  interface JWT {
+    id: string;
+    email: string;
+    role: string;
+  }
 }
+
+const credentialsSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+});
 
 export const authOptions: AuthOptions = {
   providers: [
@@ -33,15 +44,24 @@ export const authOptions: AuthOptions = {
       },
       authorize: async (credentials) => {
         if (!credentials) return null;
+
+        const validatedCredentials = credentialsSchema.safeParse(credentials);
+        if (!validatedCredentials.success) {
+          console.error(validatedCredentials.error);
+          return null;
+        }
+
+        const { email, password } = validatedCredentials.data;
+
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          where: { email },
         });
 
         if (!user || !user.password) return null;
-        const isValidPassword = await bcrypt.compare(credentials.password, user.password);
+        const isValidPassword = await bcrypt.compare(password, user.password);
         if (!isValidPassword) return null;
 
-        return { id: user.id, email: user.email, name: user.name };
+        return { id: user.id, email: user.email, name: user.name, role: user.role };
       },
     }),
   ],
@@ -50,6 +70,7 @@ export const authOptions: AuthOptions = {
       if (user) {
         token.id = user.id;
         token.email = user.email as string;
+        token.role = user.role;
       }
       return token;
     },
@@ -57,6 +78,7 @@ export const authOptions: AuthOptions = {
       if (token && session.user) {
         session.user.id = token.id;
         session.user.email = token.email;
+        session.user.role = token.role;
       }
       return session;
     },

@@ -1,46 +1,55 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { signIn } from 'next-auth/react'
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Loader2 } from 'lucide-react'
-import { FcGoogle } from "react-icons/fc";
-
+import { useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Loader2 } from 'lucide-react';
+import { FcGoogle } from 'react-icons/fc';
+import { signIn } from 'next-auth/react';
 
 export default function SignInPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState('')
-  const router = useRouter()
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError('')
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
 
     try {
-      const result = await signIn('credentials', {
-        redirect: false,
-        email,
-        password,
-      })
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-      if (result?.error) {
-        setError('Invalid email or password')
+      if (!response.ok) {
+        const data = await response.json();
+        setError(data.error || 'Invalid email or password');
+        return;
+      }
+
+      const token = response.headers.get('Authorization')?.replace('Bearer ', '');
+      if (token) {
+        localStorage.setItem('token', token);
+        router.push('/dashboard');
       } else {
-        router.push('/dashboard')
+        setError('Failed to retrieve authorization token');
       }
     } catch {
-      setError('An error occurred. Please try again.')
+      setError('An error occurred. Please try again.');
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-green-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -90,9 +99,7 @@ export default function SignInPage() {
             </div>
           </div>
 
-          {error && (
-            <div className="text-red-500 text-sm text-center">{error}</div>
-          )}
+          {error && <div className="text-red-500 text-sm text-center">{error}</div>}
 
           <div>
             <Button
@@ -100,9 +107,7 @@ export default function SignInPage() {
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
               disabled={isLoading}
             >
-              {isLoading && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Sign in
             </Button>
           </div>
@@ -118,7 +123,7 @@ export default function SignInPage() {
           </div>
           <div className="mt-6">
             <Button
-              onClick={() => signIn('google')}
+              onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
               className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
             >
               <FcGoogle className="w-5 h-5 mr-2" />
@@ -128,5 +133,5 @@ export default function SignInPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

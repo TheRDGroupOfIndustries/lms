@@ -2,11 +2,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import prisma from '@/utils/prisma';
 import { generateToken } from '@/utils/jwt';
+import { z } from 'zod';
+
+const signupSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6).optional(),
+  name: z.string().min(2),
+  isGoogleSignUp: z.boolean().default(false),
+});
 
 export async function POST(req: NextRequest) {
-  const { email, password, name, isGoogleSignUp = false } = await req.json();
 
   try {
+    const body = await req.json();
+    const validatedBody = signupSchema.safeParse(body);
+    if (!validatedBody.success) {
+      return NextResponse.json({ error: validatedBody.error.errors }, { status: 400 });
+    }
+
+    const { email, password, name, isGoogleSignUp } = validatedBody.data;
+
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
