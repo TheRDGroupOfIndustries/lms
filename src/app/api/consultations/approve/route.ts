@@ -1,51 +1,64 @@
-import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/utils/prisma";
-import { authenticate } from "@/middleware/auth";
-import { google } from "googleapis";
+import { NextRequest, NextResponse } from "next/server"
+import prisma from "@/utils/prisma"
+import { authenticate } from "@/middleware/auth"
+import { google } from "googleapis"
 
 type AuthenticatedRequest = NextRequest & {
   user: {
-    id: string;
-  };
-};
+    id: string
+  }
+}
 
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI
-);
+  `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/google/callback`
+)
 
-oauth2Client.setCredentials({
-  refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
-});
+async function getTokens() {
+  const accessToken = await prisma.systemConfig.findUnique({ where: { key: 'GOOGLE_ACCESS_TOKEN' } })
+  const refreshToken = await prisma.systemConfig.findUnique({ where: { key: 'GOOGLE_REFRESH_TOKEN' } })
 
-const calendar = google.calendar({ version: "v3", auth: oauth2Client });
+  if (!accessToken || !refreshToken) {
+    throw new Error('Google Calendar not authenticated')
+  }
+
+  return {
+    access_token: accessToken.value,
+    refresh_token: refreshToken.value,
+  }
+}
 
 async function handler(req: AuthenticatedRequest) {
   if (req.method !== "POST") {
-    return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
+    return NextResponse.json({ error: "Method not allowed" }, { status: 405 })
   }
 
-  const user = req.user;
+  const user = req.user
 
   try {
-    const { consultationId } = await req.json();
+    const { consultationId } = await req.json()
 
     const consultation = await prisma.consultation.findUnique({
       where: { id: consultationId },
       include: { instructor: { include: { user: true } }, user: true },
-    });
+    })
 
     if (!consultation) {
       return NextResponse.json(
         { error: "Consultation not found" },
         { status: 404 }
-      );
+      )
     }
 
     if (consultation.instructor.userId !== user.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
+
+    const tokens = await getTokens()
+    oauth2Client.setCredentials(tokens)
+
+    const calendar = google.calendar({ version: "v3", auth: oauth2Client })
 
     const event = {
       summary: `Consultation with ${consultation.user.name}`,
@@ -70,13 +83,13 @@ async function handler(req: AuthenticatedRequest) {
           conferenceSolutionKey: { type: "hangoutsMeet" },
         },
       },
-    };
+    }
 
     const { data } = await calendar.events.insert({
       calendarId: "primary",
       conferenceDataVersion: 1,
       requestBody: event,
-    });
+    })
 
     const updatedConsultation = await prisma.consultation.update({
       where: { id: consultationId },
@@ -84,16 +97,16 @@ async function handler(req: AuthenticatedRequest) {
         status: "APPROVED",
         meetLink: data.hangoutLink,
       },
-    });
+    })
 
-    return NextResponse.json(updatedConsultation);
+    return NextResponse.json(updatedConsultation)
   } catch (error) {
-    console.error("Consultation approval error:", error);
+    console.error("Consultation approval error:", error)
     return NextResponse.json(
       { error: "Failed to approve consultation" },
       { status: 500 }
-    );
+    )
   }
 }
 
-export const POST = authenticate(handler);
+export const POST = authenticate(handler)

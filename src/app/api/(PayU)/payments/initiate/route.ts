@@ -80,30 +80,38 @@ async function handler(req: AuthenticatedRequest) {
       user.email
     );
 
-    await prisma.payment.create({
-      data: {
-        amount,
-        currency: "INR",
-        status: "INITIATED",
-        paymentMethod: "PAYU",
-        transactionId: txnid,
-        userId: user.id,
-        courseId,
-        consultationId,
-        payuTransaction: {
-          create: {
-            txnid,
-            amount,
-            productinfo,
-            firstname: user.name,
-            email: user.email,
-            phone: user.phone,
-            status: "INITIATED",
-            hash,
+    try {
+      await prisma.payment.create({
+        data: {
+          amount,
+          currency: "INR",
+          status: "INITIATED",
+          paymentMethod: "PAYU",
+          transactionId: txnid,
+          userId: user.id,
+          courseId,
+          consultationId,
+          payuTransaction: {
+            create: {
+              txnid,
+              amount,
+              productinfo,
+              firstname: user.name,
+              email: user.email,
+              phone: user.phone,
+              status: "INITIATED",
+              hash,
+            },
           },
         },
-      },
-    });
+      });
+    } catch (error) {
+      console.error("Failed to create payment record:", error);
+      return NextResponse.json(
+        { error: "Failed to initiate payment" },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       paymentUrl: PAYU_CONFIG.payuBaseUrl,
