@@ -6,12 +6,21 @@ import { FaGlobe } from 'react-icons/fa';
 import { FiMenu, FiSearch } from 'react-icons/fi';
 import { useState } from 'react';
 import { IoClose } from 'react-icons/io5';
+import { useRouter } from 'next/navigation';
 
 export default function Header() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
+  const router = useRouter();
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  const handleLogin = () => {
+    router.push('/signin');
+  };
+
+  const handleSignup = () => {
+    router.push('/signup');
   };
 
   return (
@@ -61,12 +70,12 @@ export default function Header() {
                 <FaGlobe className="text-[#1AA34A] mb-4" />
               </div>
               {/* Log in Button */}
-              <button className="bg-green-500 shadow-md hover:shadow-lg text-white px-4 py-2 rounded-full hover:bg-green-600 transition w-full mb-4">
+              <button onClick={handleLogin} className="bg-green-500 shadow-md hover:shadow-lg text-white px-4 py-2 rounded-full hover:bg-green-600 transition w-full mb-4">
                 Log in
               </button>
 
               {/* Sign up Button */}
-              <button className="border shadow-md hover:shadow-lg border-green-500 text-green-500 px-4 py-2 rounded-full hover:bg-green-50 transition w-full">
+              <button onClick={handleSignup} className="border shadow-md hover:shadow-lg border-green-500 text-green-500 px-4 py-2 rounded-full hover:bg-green-50 transition w-full">
                 Sign up
               </button>
             </div>
@@ -92,12 +101,12 @@ export default function Header() {
           <FaGlobe className="text-[#1AA34A]" />
 
           {/* Log in Button */}
-          <button className="bg-green-500 text-white px-4 py-2 rounded-full hover:bg-green-600 transition">
+          <button onClick={handleLogin} className="bg-green-500 text-white px-4 py-2 rounded-full hover:bg-green-600 transition">
             Log in
           </button>
 
           {/* Sign up Button */}
-          <button className="border border-green-500 text-green-500 px-4 py-2 rounded-full hover:bg-green-50 transition">
+          <button onClick={handleSignup} className="border border-green-500 text-green-500 px-4 py-2 rounded-full hover:bg-green-50 transition">
             Sign up
           </button>
         </div>
