@@ -24,14 +24,50 @@ async function handler(req: AuthenticatedRequest) {
         );
       }
 
+      // Fetch all consultations for the instructor
       const consultations = await prisma.consultation.findMany({
-        where: { instructorId: instructorProfile.id },
+        where: {
+          instructorId: instructorProfile.id,
+        },
         include: {
-          user: { select: { name: true, email: true } },
+          user: {
+            select: {
+              name: true,
+              email: true,
+            },
+          },
+          payment: {
+            select: {
+              status: true,
+            },
+          },
+        },
+        orderBy: {
+          scheduledAt: 'desc',
         },
       });
 
-      return NextResponse.json(consultations);
+      // Transform the data to match the UI requirements
+      const formattedConsultations = consultations.map(consultation => ({
+        id: consultation.id,
+        student: consultation.user.name,
+        date: consultation.scheduledAt.toISOString().split('T')[0],
+        time: consultation.scheduledAt.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+        }),
+        status: consultation.status,
+        paymentStatus: consultation.payment?.status || 'PENDING',
+        duration: consultation.duration,
+        meetLink: consultation.meetLink,
+        price: consultation.price,
+        notes: consultation.notes,
+      }));
+
+      return NextResponse.json({
+        consultations: formattedConsultations,
+      });
     } catch (error) {
       console.error("Fetch consultations error:", error);
       return NextResponse.json(

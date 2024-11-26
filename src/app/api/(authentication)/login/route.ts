@@ -35,9 +35,9 @@ export async function POST(req: NextRequest) {
 
     const token = generateToken(user.id);
 
-    // Set the token in the Authorization header
-    const response = NextResponse.json({ message: 'Login successful', token: token }, { status: 200 });
-    response.headers.set('Authorization', `Bearer ${token}`);
+    // Set the token in the Authorization header and as a cookie
+    const response = NextResponse.json({ message: 'Login successful', token: token, userId: user.id }, { status: 200 });
+    response.cookies.set('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
 
     return response;
   } catch {

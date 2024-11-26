@@ -20,14 +20,41 @@ async function handler(req: AuthenticatedRequest) {
       where: { userId: user.id },
       include: {
         instructor: {
-          include: { user: { select: { name: true, email: true } } },
+          include: { 
+            user: { 
+              select: { 
+                name: true, 
+                email: true 
+              } 
+            } 
+          },
         },
-        payment: true,
+        payment: {
+          select: {
+            status: true,
+            amount: true
+          }
+        },
       },
-      orderBy: { scheduledAt: "desc" },
+      orderBy: [
+        { scheduledAt: "asc" },
+        { createdAt: "desc" }
+      ],
     });
 
-    return NextResponse.json(consultations);
+    // Transform the data to include formatted date and time
+    const formattedConsultations = consultations.map(consultation => ({
+      ...consultation,
+      formattedDate: new Date(consultation.scheduledAt).toLocaleDateString(),
+      formattedTime: new Date(consultation.scheduledAt).toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      }),
+      instructorName: consultation.instructor.user.name,
+      instructorEmail: consultation.instructor.user.email,
+    }));
+
+    return NextResponse.json(formattedConsultations);
   } catch (error) {
     console.error("Fetch user consultations error:", error);
     return NextResponse.json(

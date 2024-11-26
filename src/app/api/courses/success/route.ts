@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   // Verify the hash
   const calculatedHash = generatePayuHash(
     txnid,
-    amount,
+    String(amount),
     productinfo,
     firstname,
     email
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
           },
         },
       },
-      include: { course: true, consultation: true },
+      include: { course: true },
     });
 
     if (updatedPayment.courseId) {
@@ -48,15 +48,10 @@ export async function POST(req: NextRequest) {
           courseId: updatedPayment.courseId,
         },
       });
-    } else if (updatedPayment.consultationId) {
-      await prisma.consultation.update({
-        where: { id: updatedPayment.consultationId },
-        data: { status: "APPROVED" },
-      });
     }
 
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_BASE_URL}/payment/success`
+      `${process.env.NEXT_PUBLIC_BASE_URL}/payment/success?courseId=${updatedPayment.courseId}`
     );
   } catch (error) {
     console.error("Payment success error:", error);

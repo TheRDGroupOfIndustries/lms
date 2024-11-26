@@ -1,24 +1,46 @@
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import '../globals.css'
-import AuthProvider from '@/components/SessionProvider'
+'use client'
 
-const inter = Inter({ subsets: ['latin'] })
-
-export const metadata: Metadata = {
-  title: 'Reverent - Empowering Farmers with Knowledge',
-  description: 'Simple, easy-to-use learning for better farming',
-}
+import { SessionProvider } from 'next-auth/react'
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const router = useRouter()
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (token) {
+      // Verify token on the server-side
+      fetch('/api/verify-token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      .then(response => {
+        if (!response.ok) {
+          localStorage.removeItem('token')
+          router.push('/signin')
+        }
+      })
+      .catch(() => {
+        localStorage.removeItem('token')
+        router.push('/signin')
+      })
+    }
+  }, [router])
+
   return (
     <html lang="en">
-      <body className={inter.className}>
-        <AuthProvider>{children}</AuthProvider>
+      <body>
+        <SessionProvider>
+          {children}
+        </SessionProvider>
       </body>
     </html>
   )

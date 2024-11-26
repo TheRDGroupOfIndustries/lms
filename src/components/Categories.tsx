@@ -1,10 +1,14 @@
-"use client";
+"use client"
 
-import Image from "next/image";
-import category1 from "@/assets/Category1.svg";
-import category2 from "@/assets/Category2.svg";
-import category3 from "@/assets/Category3.svg";
-import { useRef } from "react";
+import Image from "next/image"
+import { useEffect, useState } from "react"
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Loader2, Star } from 'lucide-react'
+import category1 from "@/assets/Category1.svg"
+import category2 from "@/assets/Category2.svg"
+import category3 from "@/assets/Category3.svg"
+import { toast } from "@/hooks/use-toast"
 
 const categories = [
   { name: "Sustainable Agriculture", image: category1 },
@@ -12,87 +16,145 @@ const categories = [
   { name: "Water Management", image: category3 },
   { name: "Soil Regeneration", image: category1 },
   { name: "Fertilizers", image: category2 },
-];
+]
 
-const courses = [
-  {
-    image: category1,
-    title: "Sustainable Farming Practices",
-    price: 100,
-    rating: 4.5,
-    reviews: 32667,
-    instructor: "Dr. Ravi Patel",
-    duration: "8 weeks",
-    bestSeller: true,
-  },
-  {
-    image: category2,
-    title: "Sustainable Farming Practices",
-    price: 100,
-    rating: 4.5,
-    reviews: 32667,
-    instructor: "Dr. Ravi Patel",
-    duration: "8 weeks",
-    bestSeller: true,
-  },
-  {
-    image: category3,
-    title: "Sustainable Farming Practices",
-    price: 100,
-    rating: 4.5,
-    reviews: 32667,
-    instructor: "Dr. Ravi Patel",
-    duration: "8 weeks",
-    bestSeller: true,
-  },
-  {
-    image: category1,
-    title: "Sustainable Farming Practices",
-    price: 100,
-    rating: 4.5,
-    reviews: 32667,
-    instructor: "Dr. Ravi Patel",
-    duration: "8 weeks",
-    bestSeller: true,
-  },
-  {
-    image: category2,
-    title: "Sustainable Farming Practices",
-    price: 100,
-    rating: 4.5,
-    reviews: 32667,
-    instructor: "Dr. Ravi Patel",
-    duration: "8 weeks",
-    bestSeller: true,
-  },
-  // Add more course objects for other cards here
-];
+interface Course {
+  id: string
+  title: string
+  price: number
+  averageRating: number
+  totalRatings: number
+  thumbnailUrl: string
+  isLocked?: boolean
+  instructor: {
+    user: {
+      name: string
+    }
+  }
+}
 
 export default function Categories() {
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [imgError, setImgError] = useState(false)
+  const [courses, setCourses] = useState<Course[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleScrollRight = () => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollBy({ left: 300, behavior: "smooth" });
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const response = await fetch('/api/courses');
+        if (!response.ok) {
+          throw new Error('Failed to fetch courses');
+        }
+        const data = await response.json();
+        setCourses(data);
+      } catch (err) {
+        setError('An error occurred while fetching courses');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCourses();
+  }, []);
+
+  const rateCourse = async (courseId: string, rating: number) => {
+    try {
+      const response = await fetch('/api/courses/rate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ courseId, rating }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to rate course');
+      }
+
+      const updatedCourse = await response.json();
+      setCourses(courses.map(course =>
+        course.id === updatedCourse.id ? updatedCourse : course
+      ));
+
+      toast({
+        title: "Course Rated",
+        description: "Thank you for rating this course!",
+      });
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: "Error",
+        description: "Failed to rate the course. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleScrollLeft = () => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollBy({ left: -300, behavior: "smooth" });
-    }
-  };
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return <div className="text-center py-10 text-red-500">{error}</div>
+  }
+
+  const CourseCard = ({ course }: { course: Course }) => (
+    <div className="flex-shrink-0 bg-white rounded-lg shadow-md hover:shadow-lg transform transition-transform hover:scale-105 overflow-hidden" style={{ width: '290px' }}>
+      <div className="relative aspect-video">
+        {course.thumbnailUrl && !imgError ? (
+          <Image
+            src={course.thumbnailUrl}
+            alt={course.title}
+            layout="fill"
+            objectFit="cover"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gray-200">
+            <span className="text-gray-400">No image available</span>
+          </div>
+        )}
+      </div>
+      <div className="p-4 sm:p-6">
+      <h3 className="font-semibold text-lg">{course.title}</h3>
+          <div className="flex items-center mt-2">
+            <span className="text-green-600 font-bold">₹ {course.price?.toFixed(2) || "0.00"}</span>
+            <div className="flex items-center ml-4">
+              <span className="text-yellow-500 font-semibold">{course.averageRating?.toFixed(1) || "N/A"}</span>
+              <div className="flex ml-1">
+                {[...Array(5)].map((_, i) => (
+                  <Star
+                    key={i}
+                    className={`h-4 w-4 cursor-pointer ${
+                      i < Math.floor(course.averageRating || 0)
+                        ? "fill-current text-yellow-500"
+                        : "fill-current text-gray-300"
+                    }`}
+                    onClick={() => rateCourse(course.id, i + 1)}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground mt-2 text-[#858585]">Instructor: {course.instructor.user.name}</p>
+          <p className="text-sm text-muted-foreground mt-1">({course.totalRatings.toLocaleString()} ratings)</p>
+      </div>
+    </div>
+  );
 
   return (
-    <section className="pb-12 bg-gray-50 mx-6">
+    <section className="pb-12 bg-gray-50">
       <div className="container mx-auto px-4">
-        <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-left">
-          Categories
-        </h2>
+        <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-left">Categories</h2>
 
-        {/* Button group (Horizontal scrollable with "See All" button on the right) */}
         <div className="flex items-center justify-between">
-          <div className="overflow-x-auto whitespace-nowrap flex gap-4 py-4 scrollbar-hide ">
+          <div className="overflow-x-auto whitespace-nowrap flex gap-4 py-4 scrollbar-hide">
             {categories.map((category, index) => (
               <button
                 key={index}
@@ -103,7 +165,6 @@ export default function Categories() {
             ))}
           </div>
 
-          {/* "See All" button */}
           <div className="ml-4">
             <button className="text-green-500 text-sm sm:text-base font-semibold hover:underline flex items-center">
               See all <span className="ml-1">→</span>
@@ -111,75 +172,36 @@ export default function Categories() {
           </div>
         </div>
 
-        {/* Carousel Container */}
-        <div className="relative">
-          {/* Left Scroll Button */}
-          <button
-            className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-white shadow-lg rounded-full p-2 z-10"
-            onClick={handleScrollLeft}
-          >
-            ◀
-          </button>
-
-          {/* Grid for cards with horizontal scroll */}
-          <div
-            ref={scrollRef}
-            className="overflow-x-auto whitespace-nowrap flex gap-6 mt-8 sm:mt-12 scrollbar-hide overflow-hidden"
-          >
-            {courses.map((course, index) => (
-              <div
-                key={index}
-                className="bg-white rounded-lg shadow-md w-64 sm:w-96 inline-block transform transition-transform hover:scale-105"
-              >
-                <Image
-                  src={course.image}
-                  alt={course.title}
-                  width={400}
-                  height={250}
-                  className="w-full h-48 object-cover"
-                />
-                <div className="p-4 sm:p-6">
-                  <h3 className="text-lg sm:text-xl font-semibold mb-2">
-                    {course.title}
-                  </h3>
-                  <p className="text-green-600 font-bold mb-2">₹ {course.price}</p>
-                  <div className="flex items-center mb-2">
-                    <span className="text-yellow-500">
-                      {"★".repeat(Math.floor(course.rating))}
-                      {"☆".repeat(5 - Math.floor(course.rating))}
-                    </span>
-                    <span className="text-gray-600 ml-2">
-                      ({course.reviews})
-                    </span>
-                  </div>
-                  <p className="text-gray-600 mb-2">Instructor: {course.instructor}</p>
-                  <p className="text-gray-600 mb-4">Duration: {course.duration}</p>
-                  {course.bestSeller && (
-                    <span className="inline-block bg-yellow-400 text-white px-2 py-1 text-xs rounded-full mb-4">
-                      Bestseller
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
+        <div className="flex flex-col mb-12 mt-6 text-center md:text-left">
+          <div className="overflow-x-auto scrollbar-hide">
+            <div className="flex space-x-4 py-4">
+              {courses.slice(0,4).map((course) => (
+                <CourseCard key={course.id} course={course} />
+              ))}
+            </div>
           </div>
-
-          {/* Right Scroll Button */}
-          <button
-            className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-white shadow-lg rounded-full p-2 z-10"
-            onClick={handleScrollRight}
-          >
-            ▶
-          </button>
         </div>
 
-        {/* Show all button */}
         <div className="text-center mt-8 sm:mt-12">
-          <button className="border border-green-500 text-green-500 px-6 sm:px-20 py-2 sm:py-3 rounded-full hover:bg-green-50 transition shadow-md hover:shadow-lg">
-            Show All Courses
-          </button>
+          <Dialog>
+            <DialogTrigger asChild>
+              <button className="border border-green-500 hover:bg-green-500 hover:text-white px-6 sm:px-20 py-2 sm:py-3 rounded-full bg-white text-green-500 transition shadow-md hover:shadow-lg">
+                Show All Courses
+              </button>
+            </DialogTrigger>
+            <DialogContent className="max-w-5xl h-full scrollbar-hide">
+              <ScrollArea className="h-full w-full pr-4">
+                <div className="grid grid-cols-3 gap-4">
+                  {courses.map((course, index) => (
+                    <CourseCard key={index} course={course} />
+                  ))}
+                </div>
+              </ScrollArea>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </section>
-  );
+  )
 }
+

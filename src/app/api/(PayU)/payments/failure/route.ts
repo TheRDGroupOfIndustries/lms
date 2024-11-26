@@ -1,27 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/utils/prisma";
-import { generatePayuHash } from "@/utils/payuConfig";
+import { verifyPayuHash } from "@/utils/payuConfig";
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
+
   const status = formData.get("status") as string;
   const txnid = formData.get("txnid") as string;
-  const amount = parseFloat(formData.get("amount") as string);
+  const amount = formData.get("amount") as string;
   const productinfo = formData.get("productinfo") as string;
   const firstname = formData.get("firstname") as string;
   const email = formData.get("email") as string;
   const hash = formData.get("hash") as string;
 
   // Verify the hash
-  const calculatedHash = generatePayuHash(
+  const isValidHash = verifyPayuHash(
     txnid,
     amount,
     productinfo,
     firstname,
-    email
+    email,
+    status,
+    hash
   );
-  if (calculatedHash !== hash) {
-    return NextResponse.json({ error: "Invalid hash" }, { status: 400 });
+
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
+    ? process.env.NEXT_PUBLIC_BASE_URL.replace(/\/$/, "")
+    : "http://localhost:3000";
+
+  try {
+    new URL(baseUrl);
+  } catch {
+    console.error("Invalid base URL:", baseUrl);
+    return NextResponse.json(
+      { error: "Server configuration error" },
+      { status: 500 }
+    );
+  }
+
+  if (!isValidHash) {
+    console.error("Hash mismatch:", {
+      txnid,
+      amount,
+      productinfo,
+      firstname,
+      email,
+      hash,
+    });
+    return NextResponse.redirect(
+      `${process.env.NEXT_PUBLIC_BASE_URL}/payment/error?reason=invalid_hash`
+    );
   }
 
   try {
@@ -40,13 +68,12 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_BASE_URL}/payment/failure`
-    );
+    const failureUrl = `${baseUrl}/payment/failure`;
+    return NextResponse.redirect(failureUrl);
   } catch (error) {
-    console.error("Payment failure error:", error);
+    console.error("Payment success handler error:", error);
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_BASE_URL}/payment/error`
+      `${baseUrl}/payment/error?reason=processing_failed`
     );
   }
 }
