@@ -1,5 +1,4 @@
 import { AuthOptions, DefaultSession } from 'next-auth';
-import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import prisma from '@/utils/prisma';
 import bcrypt from 'bcryptjs';
@@ -32,10 +31,6 @@ const credentialsSchema = z.object({
 
 export const authOptions: AuthOptions = {
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
     CredentialsProvider({
       name: 'Credentials',
       credentials: {
@@ -76,15 +71,12 @@ export const authOptions: AuthOptions = {
     },
     async session({ session, token }) {
       if (token && session.user) {
-        session.user.id = token.id;
-        session.user.email = token.email;
-        session.user.role = token.role;
+        session.user.id = token.id as string;
+        session.user.email = token.email as string;
+        session.user.role = token.role as string;
       }
       return session;
     },
-  },
-  pages: {
-    signIn: '/auth/signin',
   },
   session: {
     strategy: 'jwt',

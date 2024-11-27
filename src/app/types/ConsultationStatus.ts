@@ -1,0 +1,1 @@
+export type ConsultationStatus = 'ACTIVE' | 'INACTIVE';

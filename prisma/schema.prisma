@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -27,6 +24,7 @@ enum Language {
 enum ConsultationStatus {
   PENDING
   APPROVED
+  IN_PROGRESS
   REJECTED
   COMPLETED
   CANCELLED
@@ -45,6 +43,11 @@ enum VideoSource {
   VIMEO
 }
 
+enum MaterialType {
+  FILE
+  LINK
+}
+
 enum Permission {
   MANAGE_USERS
   MANAGE_COURSES
@@ -54,6 +57,13 @@ enum Permission {
   MANAGE_SYSTEM_CONFIG
 }
 
+enum AssignmentStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+}
+
 model User {
   id                String         @id @default(cuid())
   email             String         @unique
@@ -61,15 +71,17 @@ model User {
   name              String
   role              Role           @default(USER)
   permissions       Permission[]
-  googleId          String?        @unique
   preferredLanguage Language       @default(ENGLISH)
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   courses           CourseEnrollment[]
+  courseRatings CourseRating[]
   consultations     Consultation[]
   payments          Payment[]
   tickets           Ticket[]
   instructorProfile InstructorProfile?
+  assignments       Assignment[]
+  quizzes           QuizResult[]
 }
 
 model InstructorProfile {
@@ -83,21 +95,11 @@ model InstructorProfile {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   hourlyRate    Float
-  availability  Availability[]
   freeResources FreeResource[]
-}
-
-model Availability {
-  id             String             @id @default(cuid())
-  instructor     InstructorProfile  @relation(fields: [instructorId], references: [id])
-  instructorId   String
-  dayOfWeek      Int                // 0 = Sunday, 1 = Monday, etc.
-  startTime      String             // Format: "HH:MM"
-  endTime        String             // Format: "HH:MM"
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-
-  @@unique([instructorId, dayOfWeek, startTime, endTime])
+  country     String?
+  state       String?
+  socialLinks Json?
+  profilePicture String?
 }
 
 model Course {
@@ -105,19 +107,41 @@ model Course {
   title       String
   description String
   videoUrl    String
-  videoSource VideoSource
+  videoSource VideoSource  @default(YOUTUBE)
   price       Float
   instructor  InstructorProfile @relation(fields: [instructorId], references: [id])
   instructorId String
   payments    Payment[]
+  featured  Boolean @default(false)
+  published Boolean @default(false)
   language    Language
   materials   CourseMaterial[]
   enrollments CourseEnrollment[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   audioGuide  String?
+  ratings    CourseRating[]
   translatedTitle String?
   translatedDescription String?
+  assignments Assignment[]
+  quizzes     Quiz[]
+  thumbnailUrl String?       
+
+  @@index([published, featured])
+}
+
+model CourseRating {
+  id        String   @id @default(cuid())
+  course    Course   @relation(fields: [courseId], references: [id])
+  courseId  String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  rating    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([courseId, userId])
+  @@index([courseId])
 }
 
 model CourseMaterial {
@@ -125,22 +149,81 @@ model CourseMaterial {
   course      Course   @relation(fields: [courseId], references: [id])
   courseId    String
   title       String
-  type        String   // e.g., "PDF", "LINK"
+  type        MaterialType @default(FILE)   // e.g., "PDF", "LINK"
   content     String   // URL or file path
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([courseId])
+}
+
+model CourseEnrollment {
+  id          String   @id @default(cuid())
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String
+  course      Course   @relation(fields: [courseId], references: [id])
+  courseId    String
+  enrolledAt  DateTime @default(now())
+  completedAt DateTime?
+  paymentId   String? 
+  payment     Payment? @relation("CourseEnrollments", fields: [paymentId], references: [id]) 
+  progress    Float    @default(0)
+  studyHours  Float    @default(0)
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+}
+
+model Assignment {
+  id          String           @id @default(cuid())
+  title       String
+  description String
+  dueDate     DateTime
+  course      Course           @relation(fields: [courseId], references: [id])
+  courseId    String
+  user        User             @relation(fields: [userId], references: [id])
+  userId      String
+  status      AssignmentStatus @default(NOT_STARTED)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([courseId, userId, title])
+}
+
+model Quiz {
+  id          String      @id @default(cuid())
+  title       String
+  description String
+  course      Course      @relation(fields: [courseId], references: [id])
+  courseId    String
+  questions   Question[]
+  results     QuizResult[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Question {
+  id          String   @id @default(cuid())
+  quiz        Quiz     @relation(fields: [quizId], references: [id])
+  quizId      String
+  text        String
+  options     String[] // Array of possible answers
+  correctOption Int    // Index of the correct answer in the options array
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
 
-model CourseEnrollment {
-  id        String   @id @default(cuid())
-  user      User     @relation(fields: [userId], references: [id])
-  userId    String
-  course    Course   @relation(fields: [courseId], references: [id])
-  courseId  String
-  enrolledAt DateTime @default(now())
-  completedAt DateTime?
+model QuizResult {
+  id          String   @id @default(cuid())
+  quiz        Quiz     @relation(fields: [quizId], references: [id])
+  quizId      String
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String
+  score       Float
+  completedAt DateTime @default(now())
 
-  @@unique([userId, courseId])
+  @@unique([quizId, userId])
 }
 
 model Consultation {
@@ -151,7 +234,7 @@ model Consultation {
   instructorId String
   status      ConsultationStatus @default(PENDING)
   scheduledAt DateTime
-  duration    Int                // in minutes
+  duration    Int                // in hours
   meetLink    String?
   price       Float
   payment     Payment?
@@ -179,6 +262,8 @@ model PayuTransaction {
   netAmount      Float?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  @@index([status])
 }
 
 model Payment {
@@ -194,9 +279,14 @@ model Payment {
   courseId       String?
   consultation   Consultation? @relation(fields: [consultationId], references: [id])
   consultationId String?       @unique
+  courseEnrollments CourseEnrollment[] @relation("CourseEnrollments")
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   payuTransaction PayuTransaction?
+
+  @@index([userId])
+  @@index([courseId])
+  @@index([status])
 }
 
 model Ticket {

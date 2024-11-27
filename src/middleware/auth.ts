@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/utils/jwt';
 import prisma from '@/utils/prisma';
 
-type NextRouteHandler = (req: AuthenticatedRequest) => Promise<NextResponse>;
+type NextRouteHandler = (
+  req: AuthenticatedRequest,
+  context: { params: { [key: string]: string | string[] } }
+) => Promise<NextResponse>;
 
 interface TokenPayload {
   userId: string;
@@ -13,15 +16,17 @@ interface AuthenticatedUser {
   name: string;
   email: string;
   role: string;
-  phone?: string;
 }
 
 interface AuthenticatedRequest extends NextRequest {
   user: AuthenticatedUser;
 }
 
-export const authenticate = (handler: NextRouteHandler) => async (req: NextRequest) => {
-  const token = req.headers.get('authorization')?.split(' ')[1];
+export const authenticate = (handler: NextRouteHandler) => async (
+  req: NextRequest,
+  context: { params: { [key: string]: string | string[] } }
+) => {
+  const token = req.cookies.get('token')?.value;
 
   if (!token) {
     return NextResponse.json({ error: 'Authorization token missing' }, { status: 401 });
@@ -41,7 +46,7 @@ export const authenticate = (handler: NextRouteHandler) => async (req: NextReque
     const authenticatedReq = req as AuthenticatedRequest;
     authenticatedReq.user = user;
 
-    return handler(authenticatedReq);
+    return handler(authenticatedReq, context);
   } catch {
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }

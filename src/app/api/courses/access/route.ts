@@ -31,11 +31,36 @@ async function handler(req: AuthenticatedRequest) {
           courseId: courseId,
         },
       },
+      include: {
+        payment: true,
+      },
     });
 
-    if (enrollment) {
-      return NextResponse.json({ hasAccess: true });
+    if (enrollment && enrollment.payment && enrollment.payment.status === "COMPLETED") {
+      // User has purchased the course and payment is completed
+      const course = await prisma.course.findUnique({
+        where: { id: courseId },
+        include: {
+          materials: true,
+        },
+      });
+
+      if (!course) {
+        return NextResponse.json({ error: "Course not found" }, { status: 404 });
+      }
+
+      return NextResponse.json({
+        hasAccess: true,
+        course: {
+          id: course.id,
+          title: course.title,
+          description: course.description,
+          videoUrl: course.videoUrl,
+          materials: course.materials,
+        },
+      });
     } else {
+      // User hasn't purchased the course or payment is not completed
       return NextResponse.json({ hasAccess: false });
     }
   } catch (error) {

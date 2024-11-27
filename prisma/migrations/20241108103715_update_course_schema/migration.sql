@@ -14,7 +14,13 @@ CREATE TYPE "TicketStatus" AS ENUM ('OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED')
 CREATE TYPE "VideoSource" AS ENUM ('UPLOADED', 'YOUTUBE', 'VIMEO');
 
 -- CreateEnum
+CREATE TYPE "MaterialType" AS ENUM ('FILE', 'LINK');
+
+-- CreateEnum
 CREATE TYPE "Permission" AS ENUM ('MANAGE_USERS', 'MANAGE_COURSES', 'MANAGE_CONSULTATIONS', 'MANAGE_PAYMENTS', 'MANAGE_ROLES', 'MANAGE_SYSTEM_CONFIG');
+
+-- CreateEnum
+CREATE TYPE "AssignmentStatus" AS ENUM ('NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'OVERDUE');
 
 -- CreateTable
 CREATE TABLE "User" (
@@ -24,7 +30,6 @@ CREATE TABLE "User" (
     "name" TEXT NOT NULL,
     "role" "Role" NOT NULL DEFAULT 'USER',
     "permissions" "Permission"[],
-    "googleId" TEXT,
     "preferredLanguage" "Language" NOT NULL DEFAULT 'ENGLISH',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -64,9 +69,11 @@ CREATE TABLE "Course" (
     "title" TEXT NOT NULL,
     "description" TEXT NOT NULL,
     "videoUrl" TEXT NOT NULL,
-    "videoSource" "VideoSource" NOT NULL,
+    "videoSource" "VideoSource" NOT NULL DEFAULT 'YOUTUBE',
     "price" DOUBLE PRECISION NOT NULL,
     "instructorId" TEXT NOT NULL,
+    "featured" BOOLEAN NOT NULL DEFAULT false,
+    "published" BOOLEAN NOT NULL DEFAULT false,
     "language" "Language" NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -82,7 +89,7 @@ CREATE TABLE "CourseMaterial" (
     "id" TEXT NOT NULL,
     "courseId" TEXT NOT NULL,
     "title" TEXT NOT NULL,
-    "type" TEXT NOT NULL,
+    "type" "MaterialType" NOT NULL DEFAULT 'FILE',
     "content" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -97,8 +104,61 @@ CREATE TABLE "CourseEnrollment" (
     "courseId" TEXT NOT NULL,
     "enrolledAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "completedAt" TIMESTAMP(3),
+    "progress" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "studyHours" DOUBLE PRECISION NOT NULL DEFAULT 0,
 
     CONSTRAINT "CourseEnrollment_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Assignment" (
+    "id" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "dueDate" TIMESTAMP(3) NOT NULL,
+    "courseId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "status" "AssignmentStatus" NOT NULL DEFAULT 'NOT_STARTED',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Assignment_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Quiz" (
+    "id" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "courseId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Quiz_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Question" (
+    "id" TEXT NOT NULL,
+    "quizId" TEXT NOT NULL,
+    "text" TEXT NOT NULL,
+    "options" TEXT[],
+    "correctOption" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Question_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "QuizResult" (
+    "id" TEXT NOT NULL,
+    "quizId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "score" DOUBLE PRECISION NOT NULL,
+    "completedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "QuizResult_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -199,16 +259,31 @@ CREATE TABLE "SystemConfig" (
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "User_googleId_key" ON "User"("googleId");
-
--- CreateIndex
 CREATE UNIQUE INDEX "InstructorProfile_userId_key" ON "InstructorProfile"("userId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Availability_instructorId_dayOfWeek_startTime_endTime_key" ON "Availability"("instructorId", "dayOfWeek", "startTime", "endTime");
 
 -- CreateIndex
+CREATE INDEX "Course_published_featured_idx" ON "Course"("published", "featured");
+
+-- CreateIndex
+CREATE INDEX "CourseMaterial_courseId_idx" ON "CourseMaterial"("courseId");
+
+-- CreateIndex
+CREATE INDEX "CourseEnrollment_userId_idx" ON "CourseEnrollment"("userId");
+
+-- CreateIndex
+CREATE INDEX "CourseEnrollment_courseId_idx" ON "CourseEnrollment"("courseId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "CourseEnrollment_userId_courseId_key" ON "CourseEnrollment"("userId", "courseId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Assignment_courseId_userId_title_key" ON "Assignment"("courseId", "userId", "title");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "QuizResult_quizId_userId_key" ON "QuizResult"("quizId", "userId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "PayuTransaction_paymentId_key" ON "PayuTransaction"("paymentId");
@@ -217,10 +292,22 @@ CREATE UNIQUE INDEX "PayuTransaction_paymentId_key" ON "PayuTransaction"("paymen
 CREATE UNIQUE INDEX "PayuTransaction_txnid_key" ON "PayuTransaction"("txnid");
 
 -- CreateIndex
+CREATE INDEX "PayuTransaction_status_idx" ON "PayuTransaction"("status");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Payment_transactionId_key" ON "Payment"("transactionId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Payment_consultationId_key" ON "Payment"("consultationId");
+
+-- CreateIndex
+CREATE INDEX "Payment_userId_idx" ON "Payment"("userId");
+
+-- CreateIndex
+CREATE INDEX "Payment_courseId_idx" ON "Payment"("courseId");
+
+-- CreateIndex
+CREATE INDEX "Payment_status_idx" ON "Payment"("status");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "SystemConfig_key_key" ON "SystemConfig"("key");
@@ -242,6 +329,24 @@ ALTER TABLE "CourseEnrollment" ADD CONSTRAINT "CourseEnrollment_userId_fkey" FOR
 
 -- AddForeignKey
 ALTER TABLE "CourseEnrollment" ADD CONSTRAINT "CourseEnrollment_courseId_fkey" FOREIGN KEY ("courseId") REFERENCES "Course"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Assignment" ADD CONSTRAINT "Assignment_courseId_fkey" FOREIGN KEY ("courseId") REFERENCES "Course"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Assignment" ADD CONSTRAINT "Assignment_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Quiz" ADD CONSTRAINT "Quiz_courseId_fkey" FOREIGN KEY ("courseId") REFERENCES "Course"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Question" ADD CONSTRAINT "Question_quizId_fkey" FOREIGN KEY ("quizId") REFERENCES "Quiz"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "QuizResult" ADD CONSTRAINT "QuizResult_quizId_fkey" FOREIGN KEY ("quizId") REFERENCES "Quiz"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "QuizResult" ADD CONSTRAINT "QuizResult_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Consultation" ADD CONSTRAINT "Consultation_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
