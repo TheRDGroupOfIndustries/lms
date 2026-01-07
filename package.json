@@ -46,7 +46,7 @@
     "jwt-auth": "^2.0.1",
     "lms": "file:",
     "lucide-react": "^0.453.0",
-    "next": "14.2.16",
+    "next": "14.2.35",
     "next-auth": "^4.24.10",
     "nodemailer": "^6.9.16",
     "passport": "^0.7.0",
